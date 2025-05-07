@@ -6,6 +6,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { useHealthKit } from './hooks/useHealthKit';
+import { v4 as uuidv4 } from 'uuid';
 
 // Import auth screens
 import LoginScreen from './screens/auth/LoginScreen';
@@ -508,10 +510,37 @@ const GlucoseScreen = () => {
     avg: number;
     timeInRange: number;
   } | null>(null);
+  const [healthKitEnabled, setHealthKitEnabled] = useState(false);
 
-  // Fetch glucose readings from Firebase
+  // Import the useHealthKit hook
+  const {
+    isAvailable,
+    isInitialized,
+    isLoading: healthKitLoading,
+    error: healthKitError,
+    healthData,
+    initHealthKit,
+    refreshHealthData,
+    saveBloodGlucose
+  } = useHealthKit();
+
+  // Fetch glucose readings from local storage
   const fetchGlucoseReadings = async (timeFrame: 'day' | 'week' | 'month') => {
     try {
+      // If HealthKit is initialized and we have blood glucose data, use that
+      if (isInitialized && healthData.bloodGlucose.length > 0) {
+        // Convert HealthKit blood glucose data to our app's format
+        return healthData.bloodGlucose.map(reading => ({
+          id: reading.id || uuidv4(),
+          userId: 'healthkit',
+          value: reading.value,
+          timestamp: new Date(reading.startDate),
+          notes: '',
+          createdAt: new Date(reading.startDate)
+        }));
+      }
+
+      // Otherwise, fall back to our local storage
       const { getGlucoseReadings } = await import('./services/glucoseService');
       return await getGlucoseReadings(timeFrame);
     } catch (error) {
@@ -549,15 +578,19 @@ const GlucoseScreen = () => {
       return;
     }
 
+    const glucoseValue = parseInt(newGlucoseValue);
+
     try {
+      // If HealthKit is initialized, save to HealthKit
+      if (isInitialized) {
+        await saveBloodGlucose(glucoseValue);
+      }
+
+      // Also save to our local storage
       const { addGlucoseReading } = await import('./services/glucoseService');
+      const newReading = await addGlucoseReading(glucoseValue, '');
 
-      const newReading = await addGlucoseReading(
-        parseInt(newGlucoseValue),
-        '' // Optional notes
-      );
-
-      if (!newReading) {
+      if (!newReading && !isInitialized) {
         throw new Error('Failed to add glucose reading');
       }
 
@@ -566,10 +599,33 @@ const GlucoseScreen = () => {
       setShowAddModal(false);
 
       // Refresh data
+      if (isInitialized) {
+        await refreshHealthData();
+      }
       loadGlucoseData();
     } catch (error) {
       console.error('Error adding glucose reading:', error);
       alert('Failed to add glucose reading');
+    }
+  };
+
+  // Initialize HealthKit
+  const handleConnectHealthKit = async () => {
+    if (!isAvailable) {
+      alert('HealthKit is only available on iOS devices');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await initHealthKit();
+      setHealthKitEnabled(true);
+      await loadGlucoseData();
+    } catch (error) {
+      console.error('Error initializing HealthKit:', error);
+      alert('Failed to connect to Apple Health');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -601,7 +657,14 @@ const GlucoseScreen = () => {
   // Load data when component mounts or timeFrame changes
   useEffect(() => {
     loadGlucoseData();
-  }, [timeFrame]);
+  }, [timeFrame, isInitialized, healthData.bloodGlucose]);
+
+  // Check if HealthKit is already initialized
+  useEffect(() => {
+    if (isInitialized) {
+      setHealthKitEnabled(true);
+    }
+  }, [isInitialized]);
 
   const status = currentReading ? getStatus(currentReading) : { label: 'Unknown', color: '#999' };
 
@@ -744,10 +807,34 @@ const GlucoseScreen = () => {
         </View>
       </View>
 
-      <TouchableOpacity style={styles.connectButton}>
-        <Ionicons name="bluetooth-outline" size={20} color="#4CAF50" />
-        <Text style={styles.connectButtonText}>Connect Glucose Monitor</Text>
+      <TouchableOpacity
+        style={[
+          styles.connectButton,
+          healthKitEnabled && { backgroundColor: '#e8f5e9' }
+        ]}
+        onPress={handleConnectHealthKit}
+        disabled={healthKitEnabled}
+      >
+        <Ionicons
+          name={healthKitEnabled ? "checkmark-circle-outline" : "medkit-outline"}
+          size={20}
+          color="#4CAF50"
+        />
+        <Text style={styles.connectButtonText}>
+          {healthKitEnabled ? 'Connected to Apple Health' : 'Connect to Apple Health'}
+        </Text>
       </TouchableOpacity>
+
+      {healthKitEnabled && (
+        <View style={styles.infoCard}>
+          <View style={styles.infoCardContent}>
+            <Ionicons name="information-circle-outline" size={24} color="#4CAF50" />
+            <Text style={styles.infoCardText}>
+              Your glucose data is now synced with Apple Health. New readings will be saved to both DiabFit and Apple Health.
+            </Text>
+          </View>
+        </View>
+      )}
 
       {/* Add Reading Modal */}
       {showAddModal && (
@@ -784,16 +871,30 @@ const GlucoseScreen = () => {
 
 const ProfileScreen = () => {
   const { user, signOut } = useAuth();
+  const {
+    isAvailable: healthKitAvailable,
+    isInitialized: healthKitInitialized,
+    healthData,
+    initHealthKit
+  } = useHealthKit();
+  const [healthKitEnabled, setHealthKitEnabled] = useState(false);
 
-  // Default profile data with actual user information
+  // Initialize HealthKit if available
+  useEffect(() => {
+    if (healthKitAvailable && healthKitInitialized) {
+      setHealthKitEnabled(true);
+    }
+  }, [healthKitAvailable, healthKitInitialized]);
+
+  // Default profile data with actual user information and HealthKit data if available
   const profileData = {
     name: user?.name || 'User',
     email: user?.email || '',
     diabetesType: user?.diabetesType || 'Type 2',
     diagnosisYear: user?.diagnosisYear || new Date().getFullYear() - 1,
     age: user?.age || 35,
-    weight: user?.weight || 170,
-    height: user?.height || 68,
+    weight: healthKitEnabled && healthData.weight ? healthData.weight : (user?.weight || 170),
+    height: healthKitEnabled && healthData.height ? healthData.height : (user?.height || 68),
     a1c: user?.a1c || 7.0,
     targetGlucoseRange: {
       min: user?.targetGlucoseMin || 80,
@@ -808,6 +909,7 @@ const ProfileScreen = () => {
       relationship: 'Relation',
       phone: '555-123-4567',
     },
+    healthKitEnabled: healthKitEnabled,
   };
 
   // Settings state
@@ -881,10 +983,16 @@ const ProfileScreen = () => {
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Weight</Text>
           <Text style={styles.infoValue}>{profileData.weight} lbs</Text>
+          {profileData.healthKitEnabled && (
+            <Ionicons name="checkmark-circle" size={16} color="#4CAF50" style={{ marginLeft: 5 }} />
+          )}
         </View>
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Height</Text>
           <Text style={styles.infoValue}>{Math.floor(profileData.height / 12)}'{profileData.height % 12}"</Text>
+          {profileData.healthKitEnabled && (
+            <Ionicons name="checkmark-circle" size={16} color="#4CAF50" style={{ marginLeft: 5 }} />
+          )}
         </View>
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Latest A1C</Text>
@@ -894,6 +1002,31 @@ const ProfileScreen = () => {
           <Text style={styles.infoLabel}>Target Glucose Range</Text>
           <Text style={styles.infoValue}>{profileData.targetGlucoseRange.min}-{profileData.targetGlucoseRange.max} mg/dL</Text>
         </View>
+
+        {!profileData.healthKitEnabled && healthKitAvailable && (
+          <TouchableOpacity
+            style={styles.healthKitButton}
+            onPress={async () => {
+              try {
+                await initHealthKit();
+                setHealthKitEnabled(true);
+              } catch (error) {
+                console.error('Error initializing HealthKit:', error);
+                alert('Failed to connect to Apple Health');
+              }
+            }}
+          >
+            <Ionicons name="medkit-outline" size={18} color="#FFFFFF" />
+            <Text style={styles.healthKitButtonText}>Connect to Apple Health</Text>
+          </TouchableOpacity>
+        )}
+
+        {profileData.healthKitEnabled && (
+          <View style={styles.healthKitConnectedContainer}>
+            <Ionicons name="checkmark-circle" size={18} color="#4CAF50" />
+            <Text style={styles.healthKitConnectedText}>Connected to Apple Health</Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.sectionHeader}>
@@ -1908,5 +2041,35 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: 'bold',
+  },
+
+  // HealthKit styles
+  healthKitButton: {
+    backgroundColor: '#4CAF50',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 15,
+  },
+  healthKitButtonText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  healthKitConnectedContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 10,
+    marginTop: 15,
+    backgroundColor: '#e8f5e9',
+    borderRadius: 8,
+  },
+  healthKitConnectedText: {
+    color: '#4CAF50',
+    fontWeight: 'bold',
+    marginLeft: 8,
   },
 });

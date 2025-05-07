@@ -76,5 +76,9 @@
     <string>Light</string>
     <key>UIViewControllerBasedStatusBarAppearance</key>
     <false/>
+    <key>NSHealthShareUsageDescription</key>
+    <string>DiabFit needs access to your health data to track your glucose levels, activity, and other health metrics to provide personalized fitness recommendations.</string>
+    <key>NSHealthUpdateUsageDescription</key>
+    <string>DiabFit needs permission to save your workout data, glucose readings, and other health metrics to Apple Health.</string>
   </dict>
 </plist>
