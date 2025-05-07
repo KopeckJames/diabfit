@@ -6,7 +6,16 @@
     "entryPoint": "./index.js",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.kopeckjj.diabfit"
+      "bundleIdentifier": "com.diabfit.app",
+      "buildNumber": "1",
+      "appStoreUrl": "https://apps.apple.com/app/id6745500169",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "DiabFit needs access to your health data to track your glucose levels, activity, and other health metrics to provide personalized fitness recommendations.",
+        "NSHealthUpdateUsageDescription": "DiabFit needs permission to save your workout data, glucose readings, and other health metrics to Apple Health."
+      }
     },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -27,6 +36,11 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "7019090e-962e-4ac2-8a13-83c12dbc2b1e"
+      }
     }
   }
 }
