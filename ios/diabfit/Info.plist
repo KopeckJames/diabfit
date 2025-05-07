@@ -27,7 +27,7 @@
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
-          <string>com.kopeckjj.diabfit</string>
+          <string>com.diabfit.app</string>
         </array>
       </dict>
       <dict>
