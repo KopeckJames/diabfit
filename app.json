@@ -7,7 +7,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.diabfit.app",
-      "buildNumber": "1",
+      "buildNumber": "16",
       "appStoreUrl": "https://apps.apple.com/app/id6745500169",
       "config": {
         "usesNonExemptEncryption": false
