@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView, TextInput, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
@@ -54,6 +54,7 @@ const DashboardScreen = () => {
   const [stepGoal, setStepGoal] = useState<number>(10000);
   const [healthKitEnabled, setHealthKitEnabled] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const didInitialLoad = useRef<boolean>(false);
 
   // Function to fetch data directly from Firebase
   const fetchGlucoseReadings = async () => {
@@ -108,7 +109,7 @@ const DashboardScreen = () => {
     return (inRangeCount / readings.length) * 100;
   };
 
-  // Initialize HealthKit if available
+  // Initialize HealthKit if available - only run once on component mount
   useEffect(() => {
     const initializeHealthKit = async () => {
       if (healthKitAvailable && !healthKitInitialized) {
@@ -124,11 +125,12 @@ const DashboardScreen = () => {
     };
 
     initializeHealthKit();
-  }, [healthKitAvailable, healthKitInitialized, initHealthKit]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Process step data from HealthKit
   useEffect(() => {
-    if (healthKitInitialized && healthData.steps.length > 0) {
+    if (healthKitInitialized && healthData.steps && healthData.steps.length > 0) {
       // Calculate total steps for today
       const today = new Date();
       const todayString = today.toISOString().split('T')[0];
@@ -142,7 +144,8 @@ const DashboardScreen = () => {
         setStepCount(todaySteps.value);
       }
     }
-  }, [healthKitInitialized, healthData.steps]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [healthData.steps]);
 
   useEffect(() => {
     const loadDashboardData = async () => {
@@ -187,9 +190,10 @@ const DashboardScreen = () => {
           });
         }
 
-        // Refresh HealthKit data if initialized
-        if (healthKitInitialized) {
+        // Refresh HealthKit data if initialized - but only on first load
+        if (healthKitInitialized && !didInitialLoad.current) {
           await refreshHealthData();
+          didInitialLoad.current = true;
         }
       } catch (error) {
         console.error('Error loading dashboard data:', error);
@@ -200,7 +204,8 @@ const DashboardScreen = () => {
     };
 
     loadDashboardData();
-  }, [healthKitInitialized, refreshHealthData]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (loading) {
     return (
@@ -619,8 +624,6 @@ const GlucoseScreen = () => {
   const {
     isAvailable,
     isInitialized,
-    isLoading: healthKitLoading,
-    error: healthKitError,
     healthData,
     initHealthKit,
     refreshHealthData,
