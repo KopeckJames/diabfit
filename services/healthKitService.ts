@@ -52,6 +52,11 @@ const permissions = {
       AppleHealthKit.Constants.Permissions.TotalFat,
       AppleHealthKit.Constants.Permissions.ActivitySummary,
       AppleHealthKit.Constants.Permissions.Workout,
+      AppleHealthKit.Constants.Permissions.AppleExerciseTime,
+      AppleHealthKit.Constants.Permissions.AppleStandTime,
+      AppleHealthKit.Constants.Permissions.BasalEnergyBurned,
+      AppleHealthKit.Constants.Permissions.FlightsClimbed,
+      AppleHealthKit.Constants.Permissions.MindfulSession,
     ],
     write: [
       AppleHealthKit.Constants.Permissions.BloodGlucose,
@@ -82,16 +87,52 @@ const permissions = {
 export const initHealthKit = (): Promise<void> => {
   return new Promise((resolve, reject) => {
     if (Platform.OS !== 'ios') {
+      console.error('HealthKit is only available on iOS');
       reject('HealthKit is only available on iOS');
       return;
     }
 
-    AppleHealthKit.initHealthKit(permissions, (error: string) => {
+    console.log('Initializing HealthKit with permissions:', JSON.stringify(permissions));
+
+    AppleHealthKit.isAvailable((error: string, available: boolean) => {
       if (error) {
+        console.error('Error checking HealthKit availability:', error);
         reject(error);
         return;
       }
-      resolve();
+
+      if (!available) {
+        console.error('HealthKit is not available on this device');
+        reject('HealthKit is not available on this device');
+        return;
+      }
+
+      console.log('HealthKit is available, requesting permissions...');
+
+      AppleHealthKit.initHealthKit(permissions, (initError: string) => {
+        if (initError) {
+          console.error('Error initializing HealthKit:', initError);
+          reject(initError);
+          return;
+        }
+
+        console.log('HealthKit initialized successfully');
+
+        // Check if we have permission for steps
+        AppleHealthKit.getAuthStatus(
+          { permissions: { read: [AppleHealthKit.Constants.Permissions.Steps] } },
+          (authError: string, authResult: { [key: string]: boolean }) => {
+            if (authError) {
+              console.warn('Error checking step count permission:', authError);
+            } else {
+              console.log('Step count permission status:', JSON.stringify(authResult));
+            }
+
+            // Resolve regardless of auth status check
+            resolve();
+          }
+        );
+      });
     });
   });
 };
@@ -161,22 +202,66 @@ export const getStepCount = (
     today.setHours(0, 0, 0, 0);
 
     const enhancedOptions = {
-      ...options,
       startDate: today.toISOString(), // Start from beginning of today
       endDate: new Date().toISOString(), // End at current time
     };
 
-    console.log('Enhanced options:', enhancedOptions);
+    console.log('Enhanced options for step count:', enhancedOptions);
 
+    // First try to get daily step count samples
     AppleHealthKit.getDailyStepCountSamples(enhancedOptions, (error: string, results: HealthStepSample[]) => {
       if (error) {
-        console.error('Error fetching step count:', error);
-        reject(error);
+        console.error('Error fetching daily step count:', error);
+
+        // If daily step count fails, try getting the step count directly
+        console.log('Trying alternative step count method...');
+        AppleHealthKit.getStepCount(enhancedOptions, (altError: string, altResult: HealthValue) => {
+          if (altError) {
+            console.error('Error fetching alternative step count:', altError);
+            reject(altError);
+            return;
+          }
+
+          console.log('Alternative step count result:', JSON.stringify(altResult));
+          // Convert to the same format as getDailyStepCountSamples
+          const formattedResult: HealthStepSample[] = [{
+            startDate: today.toISOString(),
+            endDate: new Date().toISOString(),
+            value: altResult.value,
+            id: 'step-count-' + Date.now()
+          }];
+
+          resolve(formattedResult);
+        });
         return;
       }
 
-      console.log('Step count results:', JSON.stringify(results));
-      resolve(results);
+      console.log('Daily step count results:', JSON.stringify(results));
+
+      if (results.length === 0) {
+        console.log('No daily step count results, trying alternative method...');
+        // If no results, try getting the step count directly
+        AppleHealthKit.getStepCount(enhancedOptions, (altError: string, altResult: HealthValue) => {
+          if (altError) {
+            console.error('Error fetching alternative step count:', altError);
+            reject(altError);
+            return;
+          }
+
+          console.log('Alternative step count result:', JSON.stringify(altResult));
+          // Convert to the same format as getDailyStepCountSamples
+          const formattedResult: HealthStepSample[] = [{
+            startDate: today.toISOString(),
+            endDate: new Date().toISOString(),
+            value: altResult.value,
+            id: 'step-count-' + Date.now()
+          }];
+
+          resolve(formattedResult);
+        });
+      } else {
+        resolve(results);
+      }
     });
   });
 };

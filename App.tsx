@@ -138,17 +138,20 @@ const DashboardScreen = () => {
 
   // Process step data from HealthKit
   useEffect(() => {
-    if (healthKitInitialized && healthData.steps) {
-      console.log('Processing step data from HealthKit:', healthData.steps);
+    if (healthKitInitialized) {
+      console.log('Processing step data from HealthKit. Initialized:', healthKitInitialized);
+      console.log('Steps data:', healthData.steps ? JSON.stringify(healthData.steps) : 'No steps data');
+
+      // If no steps data available, try to refresh health data
+      if (!healthData.steps || healthData.steps.length === 0) {
+        console.log('No step data available, refreshing health data...');
+        refreshHealthData();
+        return;
+      }
 
       // Calculate total steps for today
       const today = new Date();
       const todayString = today.toISOString().split('T')[0];
-
-      if (healthData.steps.length === 0) {
-        console.log('No step data available');
-        return;
-      }
 
       // Find today's step count
       const todaySteps = healthData.steps.find(
@@ -169,7 +172,20 @@ const DashboardScreen = () => {
           console.log('Calculated total steps for today:', totalSteps);
           setStepCount(totalSteps);
         } else {
-          console.log('No step data found for today');
+          console.log('No step data found for today, using most recent data if available');
+
+          // If no data for today, use the most recent data
+          if (healthData.steps.length > 0) {
+            // Sort by date (most recent first)
+            const sortedSteps = [...healthData.steps].sort(
+              (a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime()
+            );
+
+            console.log('Most recent step data:', sortedSteps[0]);
+            setStepCount(sortedSteps[0].value);
+          } else {
+            console.log('No step data available at all');
+          }
         }
       }
     }
