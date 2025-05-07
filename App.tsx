@@ -36,6 +36,13 @@ const HomeScreen = ({ navigation }: { navigation: any }) => {
 
 const DashboardScreen = () => {
   const { user } = useAuth();
+  const {
+    isAvailable: healthKitAvailable,
+    isInitialized: healthKitInitialized,
+    healthData,
+    initHealthKit,
+    refreshHealthData
+  } = useHealthKit();
   const [loading, setLoading] = useState(true);
   const [glucoseReading, setGlucoseReading] = useState<number | null>(null);
   const [timeInRange, setTimeInRange] = useState<number | null>(null);
@@ -43,6 +50,9 @@ const DashboardScreen = () => {
   const [lastMeal, setLastMeal] = useState<any>(null);
   const [nextWorkout, setNextWorkout] = useState<any>(null);
   const [glucoseReadings, setGlucoseReadings] = useState<any[]>([]);
+  const [stepCount, setStepCount] = useState<number>(0);
+  const [stepGoal, setStepGoal] = useState<number>(10000);
+  const [healthKitEnabled, setHealthKitEnabled] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Function to fetch data directly from Firebase
@@ -98,6 +108,42 @@ const DashboardScreen = () => {
     return (inRangeCount / readings.length) * 100;
   };
 
+  // Initialize HealthKit if available
+  useEffect(() => {
+    const initializeHealthKit = async () => {
+      if (healthKitAvailable && !healthKitInitialized) {
+        try {
+          await initHealthKit();
+          setHealthKitEnabled(true);
+        } catch (error) {
+          console.error('Error initializing HealthKit:', error);
+        }
+      } else if (healthKitInitialized) {
+        setHealthKitEnabled(true);
+      }
+    };
+
+    initializeHealthKit();
+  }, [healthKitAvailable, healthKitInitialized, initHealthKit]);
+
+  // Process step data from HealthKit
+  useEffect(() => {
+    if (healthKitInitialized && healthData.steps.length > 0) {
+      // Calculate total steps for today
+      const today = new Date();
+      const todayString = today.toISOString().split('T')[0];
+
+      // Find today's step count
+      const todaySteps = healthData.steps.find(
+        step => new Date(step.startDate).toISOString().split('T')[0] === todayString
+      );
+
+      if (todaySteps) {
+        setStepCount(todaySteps.value);
+      }
+    }
+  }, [healthKitInitialized, healthData.steps]);
+
   useEffect(() => {
     const loadDashboardData = async () => {
       setLoading(true);
@@ -140,6 +186,11 @@ const DashboardScreen = () => {
             impact: meal.glucoseImpact
           });
         }
+
+        // Refresh HealthKit data if initialized
+        if (healthKitInitialized) {
+          await refreshHealthData();
+        }
       } catch (error) {
         console.error('Error loading dashboard data:', error);
         setError('Failed to load dashboard data');
@@ -149,7 +200,7 @@ const DashboardScreen = () => {
     };
 
     loadDashboardData();
-  }, []);
+  }, [healthKitInitialized, refreshHealthData]);
 
   if (loading) {
     return (
@@ -197,6 +248,58 @@ const DashboardScreen = () => {
           </Text>
           <Text style={styles.summaryLabel}>Workouts</Text>
         </View>
+      </View>
+
+      {/* Step Counter Card */}
+      <View style={styles.stepCounterCard}>
+        <View style={styles.stepCounterHeader}>
+          <View style={styles.stepTitleContainer}>
+            <Ionicons name="footsteps" size={24} color="#4CAF50" />
+            <Text style={styles.stepCounterTitle}>Today's Steps</Text>
+          </View>
+          {healthKitEnabled && (
+            <View style={styles.healthKitBadge}>
+              <Ionicons name="medkit-outline" size={14} color="#4CAF50" />
+              <Text style={styles.healthKitBadgeText}>Apple Health</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.stepCounterContent}>
+          <Text style={styles.stepCounterValue}>{stepCount.toLocaleString()}</Text>
+          <Text style={styles.stepCounterGoal}>Goal: {stepGoal.toLocaleString()} steps</Text>
+        </View>
+
+        <View style={styles.stepProgressContainer}>
+          <View style={styles.stepProgressBackground}>
+            <View
+              style={[
+                styles.stepProgressFill,
+                { width: `${Math.min(100, (stepCount / stepGoal) * 100)}%` }
+              ]}
+            />
+          </View>
+          <Text style={styles.stepProgressText}>
+            {Math.round((stepCount / stepGoal) * 100)}% of daily goal
+          </Text>
+        </View>
+
+        {!healthKitEnabled && healthKitAvailable && (
+          <TouchableOpacity
+            style={styles.connectHealthButton}
+            onPress={async () => {
+              try {
+                await initHealthKit();
+                setHealthKitEnabled(true);
+              } catch (error) {
+                console.error('Error initializing HealthKit:', error);
+              }
+            }}
+          >
+            <Ionicons name="medkit-outline" size={16} color="#FFFFFF" />
+            <Text style={styles.connectHealthButtonText}>Connect to Apple Health</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.sectionHeader}>
@@ -2071,5 +2174,95 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
     fontWeight: 'bold',
     marginLeft: 8,
+  },
+
+  // Step Counter styles
+  stepCounterCard: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  stepCounterHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  stepTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  stepCounterTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  healthKitBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e8f5e9',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  healthKitBadgeText: {
+    fontSize: 12,
+    color: '#4CAF50',
+    marginLeft: 4,
+  },
+  stepCounterContent: {
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  stepCounterValue: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  stepCounterGoal: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 5,
+  },
+  stepProgressContainer: {
+    marginBottom: 10,
+  },
+  stepProgressBackground: {
+    height: 8,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 4,
+    marginBottom: 5,
+    overflow: 'hidden',
+  },
+  stepProgressFill: {
+    height: '100%',
+    backgroundColor: '#4CAF50',
+    borderRadius: 4,
+  },
+  stepProgressText: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+  },
+  connectHealthButton: {
+    backgroundColor: '#4CAF50',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  connectHealthButtonText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    marginLeft: 8,
+    fontSize: 14,
   },
 });
