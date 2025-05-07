@@ -1,0 +1,77 @@
+{
+  "expo": {
+    "name": "DiabFit",
+    "description": "DiabFit is a comprehensive diabetes management and fitness app that integrates glucose monitoring with personalized workouts. Track your glucose levels, steps, and other health metrics while receiving tailored fitness recommendations based on your data.",
+    "privacy": "public",
+    "platforms": ["ios"],
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "primaryColor": "#4CAF50",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "bundleIdentifier": "com.diabfit.app",
+      "buildNumber": "2",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "DiabFit needs access to your health data to track your glucose levels, activity, and other health metrics to provide personalized fitness recommendations.",
+        "NSHealthUpdateUsageDescription": "DiabFit needs permission to save your workout data, glucose readings, and other health metrics to Apple Health."
+      },
+      "appStoreUrl": "https://apps.apple.com/app/id6745500169",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "associatedDomains": [],
+      "entitlements": {
+        "com.apple.developer.healthkit": true,
+        "com.apple.developer.healthkit.access": ["health-records"]
+      }
+    },
+    "locales": {
+      "en": {
+        "name": "DiabFit",
+        "subtitle": "Diabetes & Fitness Tracker",
+        "description": "DiabFit is a comprehensive diabetes management and fitness app that integrates glucose monitoring with personalized workouts. Track your glucose levels, steps, and other health metrics while receiving tailored fitness recommendations based on your data.\n\nKey Features:\n• Glucose Monitoring: Track your blood glucose levels and see trends over time\n• Apple HealthKit Integration: Sync with Apple Health to track steps, workouts, and other health metrics\n• Personalized Workouts: Get workout recommendations based on your glucose levels and fitness goals\n• Meal Tracking: Log meals and see how they affect your glucose levels\n• Dashboard: View all your important health metrics in one place\n• Progress Tracking: Monitor your progress over time with detailed charts and statistics\n\nDiabFit helps you manage your diabetes while staying active and healthy. Whether you're newly diagnosed or have been managing diabetes for years, DiabFit provides the tools you need to take control of your health.",
+        "keywords": [
+          "diabetes",
+          "fitness",
+          "glucose",
+          "health",
+          "workout",
+          "tracker",
+          "monitor",
+          "blood sugar",
+          "exercise",
+          "healthkit"
+        ],
+        "marketingUrl": "",
+        "privacyPolicyUrl": "",
+        "supportUrl": ""
+      }
+    },
+    "appStoreConfig": {
+      "copyright": "2024 James Kopeck",
+      "primaryCategory": "HEALTH_AND_FITNESS",
+      "secondaryCategory": "MEDICAL",
+      "ageRatingDeclaration": {
+        "alcoholTobaccoOrDrugUseOrReferences": "NONE",
+        "gamblingSimulated": "NONE",
+        "horrorOrFearThemes": "NONE",
+        "matureOrSuggestiveThemes": "NONE",
+        "profanityOrCrudeHumor": "NONE",
+        "sexualContentGraphicAndNudity": "NONE",
+        "sexualContentOrNudity": "NONE",
+        "violenceCartoonOrFantasy": "NONE",
+        "violenceRealistic": "NONE",
+        "violenceRealisticProlongedGraphicOrSadistic": "NONE",
+        "gambling": false,
+        "unrestrictedWebAccess": false,
+        "kidsAgeBand": null
+      }
+    }
+  }
+}
