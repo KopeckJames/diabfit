@@ -64,17 +64,23 @@ export const useHealthKit = (): HealthKitHook => {
 
   const refreshHealthData = async (): Promise<void> => {
     if (!isAvailable || !isInitialized) {
+      console.log('HealthKit not available or not initialized');
       return;
     }
 
+    console.log('Refreshing health data...');
     setIsLoading(true);
     setError(null);
 
     try {
-      // Fetch all health data in parallel
+      // Fetch step count first to ensure it's properly loaded
+      console.log('Fetching step count...');
+      const steps = await HealthKitService.getStepCount();
+      console.log(`Fetched ${steps.length} step records`);
+
+      // Fetch other health data in parallel
       const [
         bloodGlucose,
-        steps,
         activity,
         workouts,
         heartRate,
@@ -82,13 +88,14 @@ export const useHealthKit = (): HealthKitHook => {
         heightData,
       ] = await Promise.all([
         HealthKitService.getBloodGlucose(),
-        HealthKitService.getStepCount(),
         HealthKitService.getActivitySummary(),
         HealthKitService.getWorkouts(),
         HealthKitService.getHeartRate(),
         HealthKitService.getWeight().catch(() => ({ value: null })),
         HealthKitService.getHeight().catch(() => ({ value: null })),
       ]);
+
+      console.log('All health data fetched successfully');
 
       setHealthData({
         bloodGlucose,
@@ -100,6 +107,7 @@ export const useHealthKit = (): HealthKitHook => {
         height: heightData.value,
       });
     } catch (err) {
+      console.error('Error refreshing health data:', err);
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setIsLoading(false);

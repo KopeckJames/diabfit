@@ -154,11 +154,28 @@ export const getStepCount = (
       return;
     }
 
-    AppleHealthKit.getDailyStepCountSamples(options, (error: string, results: HealthStepSample[]) => {
+    console.log('Fetching step count data with options:', options);
+
+    // Make sure we're getting today's data
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const enhancedOptions = {
+      ...options,
+      startDate: today.toISOString(), // Start from beginning of today
+      endDate: new Date().toISOString(), // End at current time
+    };
+
+    console.log('Enhanced options:', enhancedOptions);
+
+    AppleHealthKit.getDailyStepCountSamples(enhancedOptions, (error: string, results: HealthStepSample[]) => {
       if (error) {
+        console.error('Error fetching step count:', error);
         reject(error);
         return;
       }
+
+      console.log('Step count results:', JSON.stringify(results));
       resolve(results);
     });
   });

@@ -114,13 +114,21 @@ const DashboardScreen = () => {
     const initializeHealthKit = async () => {
       if (healthKitAvailable && !healthKitInitialized) {
         try {
+          console.log('Initializing HealthKit...');
           await initHealthKit();
+          console.log('HealthKit initialized successfully');
           setHealthKitEnabled(true);
+          // Immediately refresh health data after initialization
+          await refreshHealthData();
         } catch (error) {
           console.error('Error initializing HealthKit:', error);
+          alert('Could not connect to Apple Health. Please check your permissions in the Health app.');
         }
       } else if (healthKitInitialized) {
+        console.log('HealthKit already initialized');
         setHealthKitEnabled(true);
+        // Refresh health data if already initialized
+        refreshHealthData();
       }
     };
 
@@ -130,10 +138,17 @@ const DashboardScreen = () => {
 
   // Process step data from HealthKit
   useEffect(() => {
-    if (healthKitInitialized && healthData.steps && healthData.steps.length > 0) {
+    if (healthKitInitialized && healthData.steps) {
+      console.log('Processing step data from HealthKit:', healthData.steps);
+
       // Calculate total steps for today
       const today = new Date();
       const todayString = today.toISOString().split('T')[0];
+
+      if (healthData.steps.length === 0) {
+        console.log('No step data available');
+        return;
+      }
 
       // Find today's step count
       const todaySteps = healthData.steps.find(
@@ -141,11 +156,25 @@ const DashboardScreen = () => {
       );
 
       if (todaySteps) {
+        console.log('Found today\'s steps:', todaySteps.value);
         setStepCount(todaySteps.value);
+      } else {
+        // If no specific entry for today, sum up all steps from today
+        const todayStepsArray = healthData.steps.filter(
+          step => new Date(step.startDate).toISOString().split('T')[0] === todayString
+        );
+
+        if (todayStepsArray.length > 0) {
+          const totalSteps = todayStepsArray.reduce((sum, step) => sum + step.value, 0);
+          console.log('Calculated total steps for today:', totalSteps);
+          setStepCount(totalSteps);
+        } else {
+          console.log('No step data found for today');
+        }
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [healthData.steps]);
+  }, [healthData.steps, healthKitInitialized]);
 
   useEffect(() => {
     const loadDashboardData = async () => {
@@ -294,10 +323,16 @@ const DashboardScreen = () => {
             style={styles.connectHealthButton}
             onPress={async () => {
               try {
+                setLoading(true);
                 await initHealthKit();
+                await refreshHealthData(); // Explicitly refresh health data
                 setHealthKitEnabled(true);
+                alert('Successfully connected to Apple Health');
               } catch (error) {
                 console.error('Error initializing HealthKit:', error);
+                alert('Could not connect to Apple Health. Please check your permissions in the Health app.');
+              } finally {
+                setLoading(false);
               }
             }}
           >
